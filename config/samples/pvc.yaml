@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aerospike-pvc
+  namespace: aerospike
+spec:
+  storageClassName: local-ssd  # Must match the configured StorageClass
+  accessModes:
+    - ReadWriteOnce  # Suitable for local volumes (only one node can mount it)
+  resources:
+    requests:
+      storage: 10Gi  # Requested size of the volume

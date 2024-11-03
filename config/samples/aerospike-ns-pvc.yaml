@@ -1,0 +1,15 @@
+# aerospike-ns-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aerospike-ns-pvc
+  namespace: aerospike
+spec:
+  storageClassName: local-ssd
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Block  # Using Block mode for raw device access
+  resources:
+    requests:
+      storage: 5Gi
+

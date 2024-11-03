@@ -1,7 +1,16 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: "local-ssd"
+  name: "local-ssd-block"
 provisioner: "kubernetes.io/no-provisioner"
 reclaimPolicy: Delete
 volumeBindingMode: "WaitForFirstConsumer"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "local-ssd-filesystem"
+provisioner: "kubernetes.io/no-provisioner"
+reclaimPolicy: Delete
+volumeBindingMode: "WaitForFirstConsumer"
+

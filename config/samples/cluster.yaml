@@ -1,0 +1,53 @@
+apiVersion: asdb.aerospike.com/v1
+kind: AerospikeCluster
+metadata:
+  name: aerocluster
+  namespace: aerospike
+
+spec:
+  size: 2
+  image: aerospike/aerospike-server-enterprise:6.3.0.28
+
+  podSpec:
+    multiPodPerHost: true  # Allow multiple pods per host
+
+  storage:
+    blockVolumePolicy:
+      cascadeDelete: true  # Ensure volumes are deleted with the cluster
+    volumes:
+      - name: data
+        source:
+          hostPath:
+            path: /mnt/disks # Path to the local disk on the host
+            type: DirectoryOrCreate
+        aerospike:
+          path: /opt/aerospike/data  # Path inside the container
+
+      - name: aerospike-config-secret
+        source:
+          secret:
+            secretName: aerospike-secret  # Reference to the secret
+        aerospike:
+          path: /etc/aerospike/secret  # Path inside the container
+
+  aerospikeConfig:
+    service:
+      feature-key-file: /etc/aerospike/secret/features.conf  # Feature key
+
+    network:
+      service:
+        port: 3000
+      heartbeat:
+        mode: mesh
+        port: 3002
+      fabric:
+        port: 3001
+
+    namespaces:
+      - name: test  # Define a namespace
+        replication-factor: 2
+        storage-engine:
+          type: device
+          devices:
+            - /opt/aerospike/data  # Path inside the container
+

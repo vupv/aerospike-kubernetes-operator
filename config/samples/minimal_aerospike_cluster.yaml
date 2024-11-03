@@ -1,0 +1,25 @@
+apiVersion: asdb.aerospike.com/v1
+kind: AerospikeCluster
+metadata:
+  name: aerocluster-simple
+  namespace: aerospike
+spec:
+  size: 1
+  image: aerospike/aerospike-server-enterprise:6.3.0.28
+  storage:
+    blockVolumePolicy:
+      cascadeDelete: true
+    volumes:
+      - name: ns
+        aerospike:
+          path: /test/dev/xvdf
+        source:
+          persistentVolume:
+            storageClass: local-ssd
+            volumeMode: Block
+            size: 5Gi
+  aerospikeConfig:
+    network:
+      service:
+        port: 3000
+

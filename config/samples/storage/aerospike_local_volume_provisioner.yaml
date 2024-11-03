@@ -1,32 +1,42 @@
 ---
-# Source: provisioner/templates/provisioner.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: local-provisioner-config 
-  namespace: aerospike 
+  name: local-provisioner-config
+  namespace: volumes
 data:
   useNodeNameOnly: "true"
-  storageClassMap: |     
-    local-ssd:
-       hostDir: /mnt/disks
-       mountDir:  /mnt/disks
-       blockCleanerCommand:
-         - "/scripts/shred.sh"
-         - "2"
-       volumeMode: Block
+  storageClassMap: |
+    local-ssd-block:
+      hostDir: /mnt/disks
+      mountDir: /mnt/disks
+      blockCleanerCommand:
+        - "/bin/sh"
+        - "-c"
+        - "dd if=/dev/zero of=$0 bs=1M count=1024 status=progress && sync && lsblk $0"
+      volumeMode: Block
+    local-ssd-filesystem:
+      hostDir: /mnt/filesystems
+      mountDir: /mnt/filesystems
+      blockCleanerCommand:
+        - "/bin/sh"
+        - "-c"
+        - "dd if=/dev/zero of=$0 bs=1M count=1024 status=progress && sync && lsblk $0 && mkfs.ext4 -F $0 && echo 'Formatted $0 with ext4'"
+      volumeMode: Filesystem
+      fsType: ext4
+  UseJobForCleaning: "true"  # Ensure job-based cleaning is enabled
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: local-volume-provisioner
-  namespace: aerospike
+  namespace: volumes
   labels:
     app: local-volume-provisioner
 spec:
   selector:
     matchLabels:
-      app: local-volume-provisioner 
+      app: local-volume-provisioner
   template:
     metadata:
       labels:
@@ -36,7 +46,7 @@ spec:
       containers:
         - image: "registry.k8s.io/sig-storage/local-volume-provisioner:v2.4.0"
           imagePullPolicy: "Always"
-          name: provisioner 
+          name: provisioner
           securityContext:
             privileged: true
           env:
@@ -45,45 +55,70 @@ spec:
               fieldRef:
                 fieldPath: spec.nodeName
           volumeMounts:
-            - mountPath: /etc/provisioner/config 
+            - mountPath: /etc/provisioner/config
               name: provisioner-config
-              readOnly: true             
-            - mountPath:  /mnt/disks 
-              name: local-ssd
+              readOnly: true
+            - mountPath: /mnt/disks
+              name: local-ssd-block
+              mountPropagation: "HostToContainer"
+            - mountPath: /mnt/filesystems
+              name: local-ssd-filesystem
               mountPropagation: "HostToContainer"
       volumes:
         - name: provisioner-config
           configMap:
-            name: local-provisioner-config         
-        - name: local-ssd
+            name: local-provisioner-config
+        - name: local-ssd-block
           hostPath:
-            path: /mnt/disks 
+            path: /mnt/disks
+        - name: local-ssd-filesystem
+          hostPath:
+            path: /mnt/filesystems
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: local-storage-admin
-  namespace: aerospike
+  namespace: volumes
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: local-storage-provisioner-pv-clusterrole
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumes"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["create", "get", "list", "watch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-pv-binding
-  namespace: aerospike
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
-  namespace: aerospike
+  namespace: volumes
 roleRef:
   kind: ClusterRole
-  name: system:persistent-volume-provisioner
+  name: local-storage-provisioner-pv-clusterrole
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: local-storage-provisioner-node-clusterrole
-  namespace: aerospike
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -93,14 +128,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: local-storage-provisioner-node-binding
-  namespace: aerospike
 subjects:
 - kind: ServiceAccount
   name: local-storage-admin
-  namespace: aerospike
+  namespace: volumes
 roleRef:
   kind: ClusterRole
   name: local-storage-provisioner-node-clusterrole
   apiGroup: rbac.authorization.k8s.io
-
 
