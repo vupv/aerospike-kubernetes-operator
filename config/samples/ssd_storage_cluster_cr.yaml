@@ -20,15 +20,15 @@ spec:
           path: /opt/aerospike
         source:
           persistentVolume:
-            storageClass: ssd
+            storageClass: local-ssd-filesystem
             volumeMode: Filesystem
             size: 1Gi
       - name: ns
         aerospike:
-          path: /test/dev/xvdf
+          path: /es/dev/xvdf
         source:
           persistentVolume:
-            storageClass: ssd
+            storageClass: local-ssd-block
             volumeMode: Block
             size: 5Gi
       - name: aerospike-config-secret
@@ -41,18 +41,9 @@ spec:
   podSpec:
     multiPodPerHost: true
 
-  aerospikeAccessControl:
-    users:
-      - name: admin
-        secretName: auth-secret
-        roles:
-          - sys-admin
-          - user-admin
-
   aerospikeConfig:
     service:
       feature-key-file: /etc/aerospike/secret/features.conf
-    security: {}
     network:
       service:
         port: 3000
@@ -61,9 +52,9 @@ spec:
       heartbeat:
         port: 3002
     namespaces:
-      - name: test
+      - name: es
         replication-factor: 2
         storage-engine:
           type: device
           devices:
-            - /test/dev/xvdf
+            - /es/dev/xvdf
